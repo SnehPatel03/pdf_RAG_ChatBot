@@ -1,6 +1,6 @@
 import { SignedIn, SignedOut, SignIn } from "@clerk/clerk-react";
 
-import MainPage from "./pages/mainPage";
+import MainPage from "./pages/MainPage";
 
 export default function App() {
   return (
