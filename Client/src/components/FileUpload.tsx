@@ -1,5 +1,7 @@
 import { Upload } from "lucide-react";
 import * as React from "react";
+import { SignOutButton} from '@clerk/clerk-react'
+
 
 const FileUpload: React.FC = () => {
   const [isDragOver, setIsDragOver] = React.useState(false);
@@ -11,7 +13,7 @@ const FileUpload: React.FC = () => {
     el.setAttribute("accept", "application/pdf");
 
     /* Listener */
-    el.addEventListener("change", async (eve) => {
+    el.addEventListener("change", async () => {
       if (el.files && el.files.length > 0) {
         const file = el.files.item(0);
         if (file) {
@@ -75,6 +77,11 @@ const FileUpload: React.FC = () => {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-slate-800 fixed">
+      <div className='fixed top-5 left-5' >
+           <button className="border-1 border-slate-400 text-slate-400 px-3 py-1 rounded-md hover:bg-red-700 hover:border-slate-800 scale-105 hover:text-slate-200 font-bold duration-500 text-sm">
+              <SignOutButton />
+           </button>
+      </div>
       <div
         className={`
           relative cursor-pointer select-none
@@ -91,6 +98,7 @@ const FileUpload: React.FC = () => {
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
+             
         <div className="flex flex-col items-center gap-4 text-center">
           <div className={`
             p-4 rounded-full bg-slate-700 
