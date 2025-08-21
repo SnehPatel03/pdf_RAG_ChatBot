@@ -74,7 +74,7 @@ const FileUpload: React.FC = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-slate-800">
+    <div className="flex items-center justify-center min-h-screen bg-slate-800 fixed">
       <div
         className={`
           relative cursor-pointer select-none
