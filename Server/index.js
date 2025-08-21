@@ -3,16 +3,16 @@ import cors from "cors";
 import dotenv from "dotenv";
 import multer from "multer";
 import { Queue } from "bullmq";
-import path from "path";
 import { QdrantVectorStore } from "@langchain/qdrant";
 import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 dotenv.config();
 
-const genAI = new GoogleGenerativeAI("AIzaSyAArTUlZLhH7uD7IsVpMFDxd5Z7JBUoNj0");
+const app = express();
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-//Config and Make a Queue
+//Config and Make a Queue::
 const queue = new Queue("file-upload-queue", {
   connection: {
     host: "localhost",
@@ -20,6 +20,7 @@ const queue = new Queue("file-upload-queue", {
   },
 });
 
+//Storage of Multer based pdf files that have added to server ::
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, "upload/");
@@ -31,8 +32,7 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage: storage });
-const app = express();
-app.use(cors());
+app.use(cors()); //Middleware for connection
 
 app.post("/upload/pdf", upload.single("pdf"), async (req, res) => {
   await queue.add(
@@ -43,15 +43,13 @@ app.post("/upload/pdf", upload.single("pdf"), async (req, res) => {
       path: req.file.path,
     })
   );
-
   res.json({ success: true, file: req.file });
 });
 
 app.get("/chat", async (req, res) => {
   const userQuery = req.query.message;
-
   const embeddings = new GoogleGenerativeAIEmbeddings({
-    apiKey: "AIzaSyAArTUlZLhH7uD7IsVpMFDxd5Z7JBUoNj0",
+    apiKey: process.env.GEMINI_API_KEY,
   });
 
   const vectorStore = await QdrantVectorStore.fromExistingCollection(
@@ -61,10 +59,11 @@ app.get("/chat", async (req, res) => {
       collectionName: "pdf-ChatBot",
     }
   );
-
+  //Restriver
   const ret = vectorStore.asRetriever({
     k: 2,
   });
+  //invoking ans of userQuery. ::
   const result = await ret.invoke(userQuery);
 
   const SYSTEM_PROMPT = `You are a helpful AI assistant who answers user queries based on the context from the PDF file.

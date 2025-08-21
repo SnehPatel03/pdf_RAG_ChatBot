@@ -8,7 +8,7 @@ import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 const worker = new Worker(
   "file-upload-queue",
   async (job) => {
-    console.log("job", job.data);
+    // console.log("job", job.data);
     const data = JSON.parse(job.data);
     //Load PDF
     const loader = new PDFLoader(data.path);
