@@ -22,7 +22,8 @@ const worker = new Worker(
     console.log("Chunked Docs", splitedDocs.length, "chunkes Created");
 
     const embeddings = new GoogleGenerativeAIEmbeddings({
-      apiKey: "AIzaSyAArTUlZLhH7uD7IsVpMFDxd5Z7JBUoNj0",
+      apiKey: process.env.GEMINI_API_KEY,
+      model: "models/gemini-embedding-001",
     });
 
     const vectorStore = await QdrantVectorStore.fromExistingCollection(
@@ -30,7 +31,8 @@ const worker = new Worker(
       {
         url: "http://localhost:6333",
         collectionName: "pdf-ChatBot",
-      }
+        checkCompatibility: false,
+      },
     );
 
     await vectorStore.addDocuments(splitedDocs);
@@ -41,7 +43,7 @@ const worker = new Worker(
     concurrency: 100,
     connection: {
       host: "localhost",
-      port: "6379",
+      port: 6379,
     },
-  }
+  },
 );

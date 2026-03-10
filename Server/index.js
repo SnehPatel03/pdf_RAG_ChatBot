@@ -10,81 +10,128 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 dotenv.config();
 
 const app = express();
+app.use(cors());
+app.use(express.json());
+
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-//Config and Make a Queue::
+// ----------------------
+// BullMQ Queue
+// ----------------------
 const queue = new Queue("file-upload-queue", {
   connection: {
     host: "localhost",
-    port: "6379",
+    port: 6379,
   },
 });
 
-//Storage of Multer based pdf files that have added to server ::
+// ----------------------
+// Multer Storage Config
+// ----------------------
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, "upload/");
   },
   filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    const uniqueSuffix =
+      Date.now() + "-" + Math.round(Math.random() * 1e9);
     cb(null, `${uniqueSuffix}-${file.originalname}`);
   },
 });
 
-const upload = multer({ storage: storage });
-app.use(cors()); //Middleware for connection
+const upload = multer({ storage });
 
+// ----------------------
+// Upload PDF Route
+// ----------------------
 app.post("/upload/pdf", upload.single("pdf"), async (req, res) => {
-  await queue.add(
-    "file-ready",
-    JSON.stringify({
-      filename: req.file.originalname,
-      destination: req.file.destination,
-      path: req.file.path,
-    })
-  );
-  res.json({ success: true, file: req.file });
+  try {
+    await queue.add(
+      "file-ready",
+      JSON.stringify({
+        filename: req.file.originalname,
+        destination: req.file.destination,
+        path: req.file.path,
+      })
+    );
+
+    res.json({
+      success: true,
+      file: req.file,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Upload failed" });
+  }
 });
 
+// ----------------------
+// Chat Route
+// ----------------------
 app.get("/chat", async (req, res) => {
-  const userQuery = req.query.message;
-  const embeddings = new GoogleGenerativeAIEmbeddings({
-    apiKey: process.env.GEMINI_API_KEY,
-  });
+  try {
+    const userQuery = req.query.message;
 
-  const vectorStore = await QdrantVectorStore.fromExistingCollection(
-    embeddings,
-    {
-      url: "http://localhost:6333",
-      collectionName: "pdf-ChatBot",
+    if (!userQuery) {
+      return res.status(400).json({
+        error: "message query param required",
+      });
     }
-  );
-  //Restriver
-  const ret = vectorStore.asRetriever({
-    k: 2,
-  });
-  //invoking ans of userQuery. ::
-  const result = await ret.invoke(userQuery);
 
-  const SYSTEM_PROMPT = `You are a helpful AI assistant who answers user queries based on the context from the PDF file.
-Context: ${JSON.stringify(result)}
+    // Gemini Embeddings
+    const embeddings = new GoogleGenerativeAIEmbeddings({
+      apiKey: process.env.GEMINI_API_KEY,
+      model: "models/gemini-embedding-001",
+    });
+
+    // Connect to Qdrant
+    const vectorStore = await QdrantVectorStore.fromExistingCollection(
+      embeddings,
+      {
+        url: "http://localhost:6333",
+        collectionName: "pdf-ChatBot",
+        checkCompatibility: false,
+      }
+    );
+
+    const retriever = vectorStore.asRetriever({
+      k: 2,
+    });
+
+    const docs = await retriever.invoke(userQuery);
+
+    const SYSTEM_PROMPT = `
+You are a helpful AI assistant who answers user queries
+based on the context from the PDF file.
+
+Context:
+${docs.map((d) => d.pageContent).join("\n")}
 `;
 
-  // Create Gemini model instance
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({
+      model: "models/gemini-2.0-flash",
+    });
 
-  // Generate response
-  const chatResult = await model.generateContent([
-    SYSTEM_PROMPT,
-    `User Question: ${userQuery}`,
-  ]);
+    const result = await model.generateContent([
+      SYSTEM_PROMPT,
+      `User Question: ${userQuery}`,
+    ]);
 
-  return res.json({
-    message: chatResult.response.text(),
-    docs: result,
-  });
+    return res.json({
+      message: result.response.text(),
+      docs,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      error: "Chat failed",
+    });
+  }
 });
 
+// ----------------------
+// Start Server
+// ----------------------
 app.listen(3000, () => {
   console.log("Server is Listening on PORT : 3000");
 });
